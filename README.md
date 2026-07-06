@@ -2,7 +2,7 @@
 
 **An interactive vision–language–action (VLA) pipeline visualizer.**
 
-A simulated 6-DOF robot arm executes typed manipulation instructions while a synchronized panel shows the VLA pipeline deciding its every move — vision in, language in, fusion/reasoning, action out — so the "thought" and the "motion" happen together, in real time, in one view.
+A simulated 6-DOF robot arm — a full six-joint kinematic chain rendered in 3D — executes typed manipulation instructions while a synchronized panel shows the VLA pipeline deciding its every move — vision in, language in, fusion/reasoning, action out — so the "thought" and the "motion" happen together, in real time, in one view.
 
 > **Illustrative model — mimics real VLA architecture, not live inference.**
 > The pipeline *structure* is faithful to how real VLA models (RT-2, OpenVLA, π0) work: an image observation and a tokenized instruction are fused, and the result is decoded into action tokens that map to end-effector motion. The arm's kinematics are real (analytic inverse kinematics). The "reasoning" itself, however, is a rule-based stand-in — no trained neural network runs here, and the UI says so on-screen.
@@ -33,17 +33,23 @@ Stack the red block on the blue block
 
 Any of the three verbs works with any block color in the scene (red, blue, green).
 
-## Architecture
+## Two versions
 
-Single-file React component (`src/MindfulArm.jsx`), no dependencies beyond React itself.
+| | `src/MindfulArm3D.jsx` (recommended) | `src/MindfulArm.jsx` |
+|---|---|---|
+| Scene | Full 3D (three.js): lit, shadowed, orbit/zoom camera | 2.5D isometric `<canvas>` |
+| Arm | True 6-joint kinematic chain (J1 yaw · J2 shoulder · J3 elbow · J4 wrist roll · J5 wrist pitch · J6 flange roll) | 4-joint render of the same IK |
+| Dependencies | React + `three` | React only |
+
+## Architecture
 
 | Layer | Implementation |
 |---|---|
-| Scene | 2.5D isometric rendering on `<canvas>` (depth-sorted cubes, shadows, grid) |
-| Kinematics | Analytic IK: base yaw + 2-link planar (shoulder/elbow) + fixed vertical wrist |
-| Motion | Cartesian waypoint planner (approach → grasp → lift → transfer → place → retract) with eased joint-space execution at ~210 mm/s |
+| Scene (3D) | three.js parent-child joint hierarchy, directional key light with PCF soft shadows, custom pointer-based orbit/pinch camera |
+| Kinematics | Analytic IK: J1–J3 solve position (elbow-up), J5 holds the tool vertical; J4/J6 are the redundant wrist rolls (held at 0 for this task family). Live telemetry shows all six joints |
+| Motion | Cartesian waypoint planner (approach → grasp → lift → transfer → place → retract) with eased execution at ~210 mm/s |
 | "Brain" | Rule-based parser → explicit grounding → plan → action-token stream (the honest fake) |
-| Sync | One `requestAnimationFrame` loop drives both the arm and the active-token highlight |
+| Sync | One `requestAnimationFrame` loop drives the joints, the scene, and the active-token highlight |
 
 ## Running it
 
@@ -52,11 +58,14 @@ The component is self-contained. Drop it into any React app:
 ```bash
 npm create vite@latest mindful-arm-app -- --template react
 cd mindful-arm-app && npm install
-# copy src/MindfulArm.jsx in, then in src/App.jsx:
-#   import MindfulArm from './MindfulArm'
+npm install three            # only needed for the 3D version
+# copy src/MindfulArm3D.jsx in, then in src/App.jsx:
+#   import MindfulArm from './MindfulArm3D'
 #   export default MindfulArm
 npm run dev
 ```
+
+The 2.5D version (`src/MindfulArm.jsx`) works the same way with no extra dependency.
 
 ## Roadmap (not in v1)
 
